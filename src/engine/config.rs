@@ -145,8 +145,24 @@ impl FrameGenMultiplier {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VideoBackend {
+    OpenGL,
+    Vulkan,
+}
+
+impl VideoBackend {
+    pub fn label(&self) -> &'static str {
+        match self {
+            VideoBackend::OpenGL => "OpenGL FBO (GUI Integrada)",
+            VideoBackend::Vulkan => "Vulkan GPU-Next (Directo LSFG)",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancementConfig {
+    pub backend: VideoBackend,
     // Upscaling & Super Resolution
     pub upscale_mode: UpscaleMode,
     pub render_scale: RenderScale,
@@ -213,11 +229,43 @@ impl EnhancementConfig {
             let _ = std::fs::write(path, serialized);
         }
     }
+
+    pub fn sync_lsfg_conf(&self) {
+        let conf_dir = dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("/home/maple/.config"))
+            .join("lsfg-vk");
+        let conf_path = conf_dir.join("conf.toml");
+        let mult = match self.frame_gen_mode {
+            FrameGenMultiplier::Triple => 3,
+            _ => 2,
+        };
+        let content = format!(
+r#"version = 2
+
+[global]
+allow_fp16 = true
+log_level = "info"
+dll = "/home/maple/.local/share/Steam/steamapps/common/Lossless Scaling/lsfg-vk.dll"
+
+[[profile]]
+active_in = [ "maple-video-player", "maple-player", "mpv" ]
+flow_scale = 1.00
+multiplier = {}
+name = "Maple Video Player LSFG"
+override_present_mode = true
+pacing_mode = "vsync"
+performance_mode = false
+preserve_swapchain_image_count = false
+"#, mult);
+        let _ = std::fs::create_dir_all(&conf_dir);
+        let _ = std::fs::write(conf_path, content);
+    }
 }
 
 impl Default for EnhancementConfig {
     fn default() -> Self {
         Self {
+            backend: VideoBackend::OpenGL,
             upscale_mode: UpscaleMode::Off, // Default Off for instantaneous, pristine video display
             render_scale: RenderScale::Native, // 100% Native default
 

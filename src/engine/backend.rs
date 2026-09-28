@@ -30,6 +30,7 @@ pub struct MpvBackend {
     pub current_config: EnhancementConfig,
     pub shader_mgr: ShaderManager,
     pub is_file_loaded: bool,
+    pub current_file_path: Option<String>,
 }
 
 impl MpvBackend {
@@ -90,6 +91,7 @@ impl MpvBackend {
             current_config: current_config.clone(),
             shader_mgr,
             is_file_loaded: false,
+            current_file_path: None,
         };
 
         backend.apply_config(&current_config)?;
@@ -217,6 +219,7 @@ impl MpvBackend {
             .command("loadfile", &[path, "replace"])
             .map_err(|e| format!("Failed to load file: {e}"))?;
         self.is_file_loaded = true;
+        self.current_file_path = Some(path.to_string());
         // Re-apply config on new file load
         let cfg = self.current_config.clone();
         let _ = self.apply_config(&cfg);

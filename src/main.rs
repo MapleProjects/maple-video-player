@@ -3,12 +3,36 @@ mod engine;
 
 use app::MaplePlayerApp;
 use eframe::egui;
+use engine::config::EnhancementConfig;
+use engine::shaders::ShaderManager;
+use engine::vulkan_runner::VulkanRunner;
 
 fn main() -> eframe::Result<()> {
     tracing_subscriber::fmt::init();
 
     let args: Vec<String> = std::env::args().collect();
-    let initial_file = args.get(1).cloned();
+    let mut is_vulkan = false;
+    let mut initial_file = None;
+
+    for arg in args.iter().skip(1) {
+        if arg == "--vulkan" || arg == "-v" {
+            is_vulkan = true;
+        } else if !arg.starts_with('-') && initial_file.is_none() {
+            initial_file = Some(arg.clone());
+        }
+    }
+
+    if is_vulkan {
+        if let Some(ref file_path) = initial_file {
+            let config = EnhancementConfig::load_from_disk();
+            if let Ok(shader_mgr) = ShaderManager::new() {
+                if let Ok(mut child) = VulkanRunner::launch(file_path, None, &config, &shader_mgr) {
+                    let _ = child.wait();
+                    return Ok(());
+                }
+            }
+        }
+    }
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

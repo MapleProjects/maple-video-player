@@ -64,6 +64,19 @@ impl MaplePlayerApp {
         }
     }
 
+    pub fn switch_to_vulkan(&mut self) {
+        if let Some(file_path) = self.backend.current_file_path.clone() {
+            let start_time = self.backend.get_time_pos();
+            let _ = self.backend.toggle_pause();
+            let _ = crate::engine::vulkan_runner::VulkanRunner::launch(
+                &file_path,
+                start_time,
+                &self.backend.current_config,
+                &self.backend.shader_mgr,
+            );
+        }
+    }
+
     fn toggle_fullscreen(&mut self, ctx: &egui::Context) {
         self.fullscreen = !self.fullscreen;
         ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
@@ -127,6 +140,9 @@ impl MaplePlayerApp {
         }
         if ctx.input(|i| i.key_pressed(egui::Key::T)) {
             self.show_telemetry = !self.show_telemetry;
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::V)) {
+            self.switch_to_vulkan();
         }
     }
 
@@ -257,6 +273,14 @@ impl eframe::App for MaplePlayerApp {
                             UpscaleMode::Off => Color32::from_rgb(110, 115, 130),
                         };
                         ui.label(RichText::new(upscale_text).size(11.0).color(upscale_col).strong());
+
+                        if ui
+                            .button(RichText::new("🚀 Vulkan LSFG").size(11.0).strong().color(Color32::from_rgb(251, 146, 60)))
+                            .on_hover_text("Cambiar a presentación directa Vulkan GPU-Next con la capa oficial Lossless Scaling LSFG (Tecla V)")
+                            .clicked()
+                        {
+                            self.switch_to_vulkan();
+                        }
                     });
                 });
                 ui.add_space(2.0);
@@ -393,6 +417,23 @@ impl eframe::App for MaplePlayerApp {
                         .stroke(Stroke::new(1.0_f32, Color32::from_rgb(45, 52, 70)))
                         .corner_radius(CornerRadius::same(8))
                         .inner_margin(egui::Margin::same(10));
+
+                    card_frame.show(ui, |ui| {
+                        ui.label(RichText::new("0. Motor Gráfico de Renderizado:").strong().size(13.0).color(Color32::from_rgb(251, 146, 60)));
+                        ui.horizontal(|ui| {
+                            ui.label("Backend:");
+                            ui.label(RichText::new("OpenGL FBO Master").strong().color(Color32::GREEN));
+                            if ui.button(RichText::new("🚀 Activar Vulkan LSFG").strong().color(Color32::from_rgb(251, 146, 60))).clicked() {
+                                self.switch_to_vulkan();
+                            }
+                        });
+                        ui.label(
+                            RichText::new("Vulkan GPU-Next ejecuta la presentación directa en swapchain con enganche nativo de la capa VK_LAYER_LSFGVK_frame_generation (Tecla V).")
+                                .small()
+                                .color(Color32::from_rgb(140, 150, 165)),
+                        );
+                    });
+                    ui.add_space(6.0);
 
                     // Group 1: Super Resolution & Upscaling
                     card_frame.show(ui, |ui| {
@@ -605,6 +646,15 @@ impl eframe::App for MaplePlayerApp {
                                     .small()
                                     .color(Color32::from_rgb(192, 132, 252)),
                             );
+
+                            ui.add_space(4.0);
+                            if ui
+                                .button(RichText::new("🚀 Activar en Modo Vulkan LSFG (Tecla V)").strong().color(Color32::from_rgb(251, 146, 60)))
+                                .on_hover_text("Inicia el motor Vulkan GPU-Next con la capa oficial de Lossless Scaling activa en la swapchain")
+                                .clicked()
+                            {
+                                self.switch_to_vulkan();
+                            }
                         }
                     });
 
@@ -818,6 +868,10 @@ impl eframe::App for MaplePlayerApp {
 
                         ui.label("Cuadros Perdidos (Drops):");
                         ui.label(format!("{}", self.backend.get_frame_drop_count().unwrap_or(0)));
+                        ui.end_row();
+
+                        ui.label("Capa Vulkan LSFG:");
+                        ui.label(RichText::new("VK_LAYER_LSFGVK_frame_generation (Lista • Tecla V)").color(Color32::from_rgb(251, 146, 60)));
                         ui.end_row();
                     });
                 });
