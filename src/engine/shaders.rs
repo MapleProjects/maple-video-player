@@ -7,10 +7,12 @@ pub const SNAPDRAGON_GSR_SHADER: &str = include_str!("../shaders/snapdragon_gsr.
 pub const CAS_SHADER: &str = include_str!("../shaders/cas.glsl");
 pub const DEBAND_EXT_SHADER: &str = include_str!("../shaders/deband_ext.glsl");
 pub const ANIME4K_SHADER: &str = include_str!("../shaders/anime4k_upscale_cnn.glsl");
+pub const MAPLE_HUD_LUA: &str = include_str!("../scripts/maple_hud.lua");
 
 #[derive(Debug)]
 pub struct ShaderManager {
     shader_dir: PathBuf,
+    scripts_dir: PathBuf,
     generation: AtomicUsize,
 }
 
@@ -18,13 +20,16 @@ impl ShaderManager {
     pub fn new() -> Result<Self, std::io::Error> {
         let base_dir = dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("/home/maple/.config"))
-            .join("maple-player")
-            .join("shaders");
+            .join("maple-player");
+        let shader_dir = base_dir.join("shaders");
+        let scripts_dir = base_dir.join("scripts");
 
-        fs::create_dir_all(&base_dir)?;
+        fs::create_dir_all(&shader_dir)?;
+        fs::create_dir_all(&scripts_dir)?;
 
         let mgr = Self {
-            shader_dir: base_dir,
+            shader_dir,
+            scripts_dir,
             generation: AtomicUsize::new(0),
         };
         mgr.install_default_shaders()?;
@@ -37,6 +42,7 @@ impl ShaderManager {
         fs::write(self.shader_dir.join("cas.glsl"), CAS_SHADER)?;
         fs::write(self.shader_dir.join("deband_ext.glsl"), DEBAND_EXT_SHADER)?;
         fs::write(self.shader_dir.join("anime4k.glsl"), ANIME4K_SHADER)?;
+        fs::write(self.scripts_dir.join("maple_hud.lua"), MAPLE_HUD_LUA)?;
         Ok(())
     }
 

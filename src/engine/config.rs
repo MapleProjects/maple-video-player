@@ -1,5 +1,6 @@
+#![allow(dead_code)]
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UpscaleMode {
@@ -143,20 +144,34 @@ impl FrameGenMultiplier {
             FrameGenMultiplier::Custom => "Personalizado",
         }
     }
+
+    pub fn multiplier_number(&self) -> u32 {
+        match self {
+            FrameGenMultiplier::Native => 1,
+            FrameGenMultiplier::Triple => 3,
+            _ => 2,
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum VideoBackend {
-    OpenGL,
     Vulkan,
+}
+
+impl<'de> Deserialize<'de> for VideoBackend {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let _ = String::deserialize(deserializer)?;
+        Ok(VideoBackend::Vulkan)
+    }
 }
 
 impl VideoBackend {
     pub fn label(&self) -> &'static str {
-        match self {
-            VideoBackend::OpenGL => "OpenGL FBO (GUI Integrada)",
-            VideoBackend::Vulkan => "Vulkan GPU-Next (Directo LSFG)",
-        }
+        "Vulkan GPU-Next (Directo LSFG)"
     }
 }
 
@@ -198,8 +213,9 @@ pub struct EnhancementConfig {
     pub custom_target_fps: f64,
     pub vsync_target_hz: f64,
 
-    // Hardware decoding
+    // Hardware decoding & HDR
     pub hwdec: String,
+    pub hdr_mode: bool,
 }
 
 impl EnhancementConfig {
@@ -235,10 +251,7 @@ impl EnhancementConfig {
             .unwrap_or_else(|| PathBuf::from("/home/maple/.config"))
             .join("lsfg-vk");
         let conf_path = conf_dir.join("conf.toml");
-        let mult = match self.frame_gen_mode {
-            FrameGenMultiplier::Triple => 3,
-            _ => 2,
-        };
+        let mult = self.frame_gen_mode.multiplier_number();
         let content = format!(
 r#"version = 2
 
@@ -265,9 +278,9 @@ preserve_swapchain_image_count = false
 impl Default for EnhancementConfig {
     fn default() -> Self {
         Self {
-            backend: VideoBackend::OpenGL,
-            upscale_mode: UpscaleMode::Off, // Default Off for instantaneous, pristine video display
-            render_scale: RenderScale::Native, // 100% Native default
+            backend: VideoBackend::Vulkan,
+            upscale_mode: UpscaleMode::SnapdragonGsr,
+            render_scale: RenderScale::Native,
 
             fsr_sharpness: 0.80,
             fsr_denoise: 0.20,
@@ -290,12 +303,13 @@ impl Default for EnhancementConfig {
             temporal_dither: true,
             extra_deband_shader: false,
 
-            interpolation_enabled: false,
-            frame_gen_mode: FrameGenMultiplier::VsyncMatch,
-            custom_target_fps: 60.0,
+            interpolation_enabled: true,
+            frame_gen_mode: FrameGenMultiplier::Double,
+            custom_target_fps: 120.0,
             vsync_target_hz: 120.21,
 
-            hwdec: "auto-safe".to_string(),
+            hwdec: "nvdec-copy".to_string(),
+            hdr_mode: true,
         }
     }
 }

@@ -6,7 +6,7 @@ pub struct VulkanRunner;
 
 impl VulkanRunner {
     pub fn build_mpv_args(
-        file_path: &str,
+        file_path: Option<&str>,
         start_time: Option<f64>,
         config: &EnhancementConfig,
         shader_mgr: &ShaderManager,
@@ -21,14 +21,16 @@ impl VulkanRunner {
         args.push("--framedrop=no".to_string());
         args.push("--fbo-format=rgba16f".to_string());
 
-        // 2. High dynamic range & wide gamut colorspace tags
+        // 2. High dynamic range & 10-bit wide gamut colorspace tags
         args.push("--target-colorspace-hint=yes".to_string());
         args.push("--target-colorspace-hint-mode=source-dynamic".to_string());
         args.push("--target-prim=auto".to_string());
         args.push("--target-trc=auto".to_string());
+        args.push("--hdr-compute-peak=yes".to_string());
         args.push("--vo-image-tag-colorspace=yes".to_string());
         args.push("--keep-open=yes".to_string());
         args.push("--title=🍁 Maple Video Player (Vulkan GPU-Next • LSFG Layer)".to_string());
+        args.push("--input-ipc-server=/tmp/maple-player.sock".to_string());
 
         // 3. Debanding and Bit Depth
         if config.deband_enabled {
@@ -107,20 +109,38 @@ impl VulkanRunner {
             }
         }
 
-        // Target file
-        args.push(file_path.to_string());
+        // 7. Load Maple Player Integrated On-Screen HUD script
+        let hud_script = dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("/home/maple/.config"))
+            .join("maple-player")
+            .join("scripts")
+            .join("maple_hud.lua");
+        if hud_script.exists() {
+            args.push(format!("--script={}", hud_script.to_string_lossy()));
+        }
+
+        // 8. Target file or idle window
+        if let Some(path) = file_path {
+            args.push(path.to_string());
+        } else {
+            args.push("--idle=yes".to_string());
+            args.push("--force-window=yes".to_string());
+        }
 
         args
     }
 
     pub fn launch(
-        file_path: &str,
+        file_path: Option<&str>,
         start_time: Option<f64>,
         config: &EnhancementConfig,
         shader_mgr: &ShaderManager,
     ) -> Result<Child, std::io::Error> {
         // Sync LSFG conf.toml before launch
         config.sync_lsfg_conf();
+
+        // Clean up any stale socket
+        let _ = std::fs::remove_file("/tmp/maple-player.sock");
 
         let args = Self::build_mpv_args(file_path, start_time, config, shader_mgr);
 
@@ -134,6 +154,8 @@ impl VulkanRunner {
             .env("XDG_RUNTIME_DIR", xdg_runtime_dir)
             .env("ENABLE_LSFG", "1")
             .env("DISABLE_LSFGVK", "0")
+            .env("ENABLE_HDR_WSI", "1")
+            .env("DXVK_HDR", "1")
             .spawn()
     }
 }
